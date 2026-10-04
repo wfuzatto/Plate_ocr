@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "source_commit": "6be42f0a20664b99f72613286fa5d98be502113b",
+  "source_commit": "259d0c735d4f45d2ab0b069fe666fb763b7f8cb6",
   "version": "1.0.0",
   "artifacts": [
-    {"os":"linux","arch":"amd64","path":"offline/bin/linux-amd64/plate-ocr","sha256":"580e656a8e2a349da07a50005ff54d1c1b063993f364ebd782ad8e6c9bc64f8d"},
-    {"os":"linux","arch":"arm64","path":"offline/bin/linux-arm64/plate-ocr","sha256":"7684780680e6d957a7079783a68222db5b1a8b73bd378ce2ff911104b02e5e84"}
+    {"os":"linux","arch":"amd64","path":"offline/bin/linux-amd64/plate-ocr","sha256":"c84087ef172c79baf16c52fe0bea1111125e6d24344ead1a52f9844094102e00"},
+    {"os":"linux","arch":"arm64","path":"offline/bin/linux-arm64/plate-ocr","sha256":"cdcd5c3252939e3b74a0c758d4da1a1e3578c8c45f8f8d9b65d5199287e0d98b"}
   ]
 }
