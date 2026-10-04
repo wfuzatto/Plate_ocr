@@ -2,65 +2,61 @@
 
 Plugin oficial de OCR/LPR para a plataforma NVR.
 
-O plugin detecta veículos/placas, executa OCR, agrega leituras entre múltiplos frames e publica eventos normalizados no barramento do NVR.
+O plugin detecta veículos/placas, executa OCR, agrega leituras entre múltiplos frames e publica eventos normalizados no barramento do NVR. Ele nunca abre RTSP diretamente: os frames pertencem ao Media Engine / Frame Broker do NVR.
+
+## Estado atual — 0.2.0
+
+O núcleo offline já está implementado em Go e não possui dependências externas:
+
+- normalização Mercosul e padrão brasileiro anterior;
+- candidatos de ambiguidades OCR sem reescrever silenciosamente a leitura original;
+- agregação multi-frame;
+- deduplicação temporal por câmera;
+- score OCR + detector;
+- geração determinística de eventos;
+- interfaces desacopladas para detector e OCR;
+- pipeline de frame decodificado;
+- replay JSONL para testes;
+- testes unitários.
+
+O detector de placa e o OCR neural serão conectados atrás das interfaces existentes quando o NVR entregar frames decodificados em pixel format. Modelos ONNX e runtimes de inferência só serão ativados quando estiverem vendorizados no próprio pacote offline.
 
 ## Princípios
 
 - Não abre RTSP diretamente.
-- Recebe frames do Frame Broker do NVR.
-- Pode executar em CPU ou GPU.
-- Não bloqueia gravação/live.
-- É idempotente.
-- Faz deduplicação temporal por câmera.
-- Mantém candidates/confidence para auditoria da leitura.
-- Permite modelos substituíveis sem alterar o contrato externo.
+- Não bloqueia gravação ou live.
+- Funciona sem Internet.
+- Não baixa modelos em runtime.
+- Preserva `raw_text`, candidatos e confidence para auditoria.
+- Modelos são substituíveis sem alterar o contrato externo.
 
 ## Pipeline
 
-```
-Frame
+```text
+Frame decodificado do NVR
   -> ROI/zone filter
   -> plate detector
   -> crop + perspective correction
-  -> OCR
+  -> OCR top-N
   -> normalization
   -> multi-frame association
   -> confidence aggregation
   -> dedupe
-  -> plate.detected event
+  -> nvr.event.plate.detected.v1
 ```
 
-## Runtime de inferência
+## Desenvolvimento offline
 
-A camada de inferência será abstrata. Baseline:
-- ONNX Runtime;
-- CPU provider como fallback;
-- CUDA/TensorRT quando disponível;
-- possibilidade futura de OpenVINO/AMD sem mudar a API do plugin.
+```bash
+make test
+make build
+./bin/plate-ocr normalize -text ABC1D23 -confidence 0.94
+```
 
-Modelos específicos não serão acoplados ao core.
+Replay de observações reconhecidas:
 
-## Placas brasileiras
+```bash
+./bin/plate-ocr replay -config configs/default.json < observations.jsonl
+```
 
-O normalizador deve reconhecer e pontuar:
-- padrão Mercosul;
-- padrão brasileiro anterior;
-- confusões OCR comuns (O/0, I/1, B/8 etc.) apenas como candidatos, sem alterar silenciosamente a leitura original.
-
-Sempre armazenar:
-- `raw_text`;
-- `normalized_text`;
-- `candidates`;
-- `ocr_confidence`;
-- `detector_confidence`;
-- evidência visual quando autorizada.
-
-## Evento principal
-
-`nvr.event.plate.detected.v1`
-
-A especificação detalhada está em `docs/ARCHITECTURE.md`.
-
-## Status
-
-Fase 0 — arquitetura/contrato.
+Veja `docs/ARCHITECTURE.md`, `docs/EVENT_SCHEMA.md` e `docs/IMPLEMENTATION.md`.
