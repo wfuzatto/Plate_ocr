@@ -42,8 +42,7 @@ func (s *Service) MetricsText()string{
 		{"plate_ocr_spool_replayed_total",strconv.FormatUint(s.spoolReplayed.Load(),10)},
 		{"plate_ocr_spool_pending",strconv.Itoa(spoolCount)},
 	}
-	for _,kv:=range lines{fmt.Fprintf(&b,"%s %s
-",kv[0],kv[1])}
+	for _,kv:=range lines{fmt.Fprintf(&b,"%s %s%c",kv[0],kv[1],10)}
 	return b.String()
 }
 
