@@ -48,8 +48,7 @@ func (s *Store) Enqueue(ev domain.PlateEvent,evidence []byte)error{
 	clean.EvidenceJPEG=nil
 	payload,err:=json.Marshal(diskJob{Event:clean,EvidenceFile:evidenceName})
 	if err!=nil{return err}
-	if err:=atomicWrite(filepath.Join(s.dir,base+".json"),append(payload,'
-'),0o600);err!=nil{
+	if err:=atomicWrite(filepath.Join(s.dir,base+".json"),append(payload, 10),0o600);err!=nil{
 		if evidenceName!=""{_ = os.Remove(filepath.Join(s.dir,evidenceName))}
 		return err
 	}
