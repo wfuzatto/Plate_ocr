@@ -1,0 +1,27 @@
+apiVersion: nvr.plugin/v1
+kind: Plugin
+metadata:
+  id: plate-ocr
+  name: Plate OCR
+  version: 0.1.0
+spec:
+  capabilities:
+    - frames:read
+    - events:publish
+    - snapshots:write
+    - config:read
+    - gpu:use
+  frameProfile:
+    maxFps: 15
+    maxWidth: 2560
+    maxHeight: 1440
+    pixelFormat: NV12
+  resources:
+    cpu: "2"
+    memory: "2Gi"
+    gpu: optional
+  events:
+    consumes: []
+    publishes:
+      - nvr.event.plate.detected.v1
+      - nvr.event.plate.track.v1
