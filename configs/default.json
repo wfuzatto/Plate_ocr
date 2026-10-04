@@ -1,0 +1,8 @@
+{
+  "track_ttl_ms": 1200,
+  "dedupe_ttl_ms": 5000,
+  "min_observations": 2,
+  "min_event_confidence": 0.70,
+  "max_candidates_per_read": 8,
+  "max_active_tracks_per_camera": 128
+}

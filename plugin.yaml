@@ -3,7 +3,7 @@ kind: Plugin
 metadata:
   id: plate-ocr
   name: Plate OCR
-  version: 0.1.0
+  version: 0.2.0
 spec:
   capabilities:
     - frames:read
