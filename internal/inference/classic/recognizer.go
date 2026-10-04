@@ -119,8 +119,10 @@ func matchCell(g vision.Gray,class byte,invert bool)(rune,float64){
 				x1:=(gx+1)*g.W/5
 				y0:=gy*g.H/7
 				y1:=(gy+1)*g.H/7
-				mean:=g.MeanRect(x0,y0,x1,y1)
-				fg:=mean<=float64(threshold)
+				cx:=(x0+x1-1)/2
+				cy:=(y0+y1-1)/2
+				center:=g.At(cx,cy)
+				fg:=center<=threshold
 				if invert{fg=!fg}
 				want:=tmpl[gy][gx]=='1'
 				if fg!=want{diff++}
