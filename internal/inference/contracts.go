@@ -2,6 +2,7 @@ package inference
 
 import (
 	"context"
+	"image"
 	"time"
 
 	"github.com/wfuzatto/Plate_ocr/internal/domain"
@@ -17,34 +18,39 @@ const (
 )
 
 type Frame struct {
-	FrameID string
-	CameraID string
+	FrameID    string
+	CameraID   string
 	ObservedAt time.Time
-	Width int
-	Height int
-	Stride int
-	Format PixelFormat
-	Data []byte
+	Width      int
+	Height     int
+	Stride     int
+	Format     PixelFormat
+	Data       []byte
+	Image      image.Image
+	ROI        *domain.BBox
+	Lane       string
+	Direction  string
 }
 
 type Detection struct {
-	BBox domain.BBox
+	BBox       domain.BBox
 	Confidence float64
-	Lane string
-	Direction string
+	Lane       string
+	Direction  string
 }
 
 type Detector interface {
-	Detect(context.Context, Frame) ([]Detection,error)
+	Detect(context.Context, Frame) ([]Detection, error)
 }
+
 type Recognizer interface {
-	Recognize(context.Context, Frame, Detection) ([]domain.RawOCRCandidate,error)
+	Recognize(context.Context, Frame, Detection) ([]domain.RawOCRCandidate, error)
 }
 
 type ProviderInfo struct {
-	Name string
-	Version string
-	Device string
-	ModelID string
-	ModelSHA256 string
+	Name        string `json:"name"`
+	Version     string `json:"version"`
+	Device      string `json:"device"`
+	ModelID     string `json:"model_id"`
+	ModelSHA256 string `json:"model_sha256,omitempty"`
 }

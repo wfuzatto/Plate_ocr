@@ -1,0 +1,81 @@
+name: plate-ocr-ci
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "offline/bin/**"
+      - "offline/manifest.json"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: plate-ocr-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    env:
+      GOPROXY: "off"
+      GOSUMDB: "off"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.x"
+          cache: false
+
+      - name: Test with network dependency resolution disabled
+        run: go test ./...
+
+      - name: Verify offline policy
+        run: sh scripts/verify-offline.sh
+
+      - name: Build offline binaries
+        run: |
+          mkdir -p offline/bin/linux-amd64 offline/bin/linux-arm64
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o offline/bin/linux-amd64/plate-ocr ./cmd/plate-ocr
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o offline/bin/linux-arm64/plate-ocr ./cmd/plate-ocr
+          (cd offline/bin/linux-amd64 && sha256sum plate-ocr > plate-ocr.sha256)
+          (cd offline/bin/linux-arm64 && sha256sum plate-ocr > plate-ocr.sha256)
+
+      - name: Generate manifest
+        run: |
+          AMD64_SHA="$(cut -d' ' -f1 offline/bin/linux-amd64/plate-ocr.sha256)"
+          ARM64_SHA="$(cut -d' ' -f1 offline/bin/linux-arm64/plate-ocr.sha256)"
+          cat > offline/manifest.json <<EOF
+          {
+            "schema_version": 1,
+            "source_commit": "$GITHUB_SHA",
+            "version": "1.0.0",
+            "artifacts": [
+              {"os":"linux","arch":"amd64","path":"offline/bin/linux-amd64/plate-ocr","sha256":"$AMD64_SHA"},
+              {"os":"linux","arch":"arm64","path":"offline/bin/linux-arm64/plate-ocr","sha256":"$ARM64_SHA"}
+            ]
+          }
+          EOF
+
+      - name: Commit offline binaries
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add offline/bin offline/manifest.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "build: refresh Plate OCR offline binaries [skip ci]"
+          git push
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: plate-ocr-offline
+          path: |
+            offline/bin/
+            offline/manifest.json
+            offline/install.sh
+            offline/run-portable.sh
+            configs/default.json
+            deploy/plate-ocr.service

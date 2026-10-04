@@ -31,6 +31,7 @@ type track struct {
 	detectorBest float64
 	lane, direction string
 	scores map[string]*candidateScore
+	evidence []byte
 }
 type Manager struct {
 	mu sync.Mutex
@@ -39,7 +40,7 @@ type Manager struct {
 }
 
 func New(cfg Config) *Manager {
-	if cfg.MaxActivePerCamera < 1 { cfg.MaxActivePerCamera = 128 }
+	if cfg.MaxActivePerCamera < 1 { cfg.MaxActivePerCamera = 64 }
 	return &Manager{cfg:cfg, byCamera:make(map[string][]*track)}
 }
 
@@ -73,6 +74,9 @@ func (m *Manager) Observe(o domain.NormalizedObservation) {
 		best.bbox = o.BBox
 		if o.Lane != "" { best.lane = o.Lane }
 		if o.Direction != "" { best.direction = o.Direction }
+		if len(o.EvidenceJPEG)>0 { best.evidence=append(best.evidence[:0],o.EvidenceJPEG...) }
+	} else if len(best.evidence)==0 && len(o.EvidenceJPEG)>0 {
+		best.evidence=append([]byte(nil),o.EvidenceJPEG...)
 	}
 	for _, c := range o.Candidates {
 		key := c.NormalizedText + "|" + c.Format
@@ -88,17 +92,14 @@ func (m *Manager) Observe(o domain.NormalizedObservation) {
 }
 
 func (m *Manager) FlushExpired(now time.Time) []domain.PlateEvent {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.mu.Lock(); defer m.mu.Unlock()
 	var out []domain.PlateEvent
 	for camera, tracks := range m.byCamera {
 		keep := tracks[:0]
 		for _, t := range tracks {
 			if now.Sub(t.last) >= m.cfg.TrackTTL {
 				if e, ok := m.finalize(t); ok { out = append(out,e) }
-			} else {
-				keep = append(keep,t)
-			}
+			} else { keep = append(keep,t) }
 		}
 		if len(keep)==0 { delete(m.byCamera,camera) } else { m.byCamera[camera]=keep }
 	}
@@ -106,13 +107,10 @@ func (m *Manager) FlushExpired(now time.Time) []domain.PlateEvent {
 }
 
 func (m *Manager) FlushAll() []domain.PlateEvent {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.mu.Lock(); defer m.mu.Unlock()
 	var out []domain.PlateEvent
 	for camera, tracks := range m.byCamera {
-		for _, t := range tracks {
-			if e, ok := m.finalize(t); ok { out = append(out,e) }
-		}
+		for _, t := range tracks { if e, ok := m.finalize(t); ok { out = append(out,e) } }
 		delete(m.byCamera,camera)
 	}
 	return out
@@ -139,9 +137,10 @@ func (m *Manager) finalize(t *track) (domain.PlateEvent,bool) {
 	return domain.PlateEvent{
 		EventID:eventID(t.id,c.NormalizedText,t.first), EventType:domain.EventTypePlateDetectedV1,
 		SchemaVersion:"1", CameraID:t.camera, ObservedAt:t.first, PluginID:"plate-ocr",
-		PluginVersion:"0.2.0", Confidence:conf, DedupeKey:dedupe, TrackID:t.id,
+		PluginVersion:"1.0.0", Confidence:conf, DedupeKey:dedupe, TrackID:t.id,
 		RawText:c.RawText, NormalizedText:c.NormalizedText, Format:c.Format, Candidates:cands,
 		DetectorConfidence:t.detectorBest, BBox:t.bbox, Lane:t.lane, Direction:t.direction,
+		EvidenceJPEG:append([]byte(nil),t.evidence...),
 	}, true
 }
 
@@ -168,9 +167,7 @@ func eventID(track, plate string, t time.Time) string {
 func distance(a,b string) int {
 	ar,br:=[]rune(a),[]rune(b)
 	if len(ar)!=len(br) { if len(ar)>len(br){return len(ar)}; return len(br) }
-	d:=0
-	for i:=range ar { if ar[i]!=br[i] { d++ } }
-	return d
+	d:=0; for i:=range ar { if ar[i]!=br[i] { d++ } }; return d
 }
 func clamp(v float64) float64 { if v<0{return 0}; if v>1{return 1}; return v }
 func maxi(a,b int) int { if a>b{return a}; return b }

@@ -21,23 +21,20 @@ func (b BBox) IoU(o BBox) float64 {
 	x2 := minf(b.X2, o.X2)
 	y2 := minf(b.Y2, o.Y2)
 	w, h := x2-x1, y2-y1
-	if w <= 0 || h <= 0 {
-		return 0
-	}
+	if w <= 0 || h <= 0 { return 0 }
 	inter := w * h
 	a := (b.X2 - b.X1) * (b.Y2 - b.Y1)
 	c := (o.X2 - o.X1) * (o.Y2 - o.Y1)
 	return inter / (a + c - inter)
 }
 
-func maxf(a, b float64) float64 {
-	if a > b { return a }
-	return b
+func (b BBox) CenterInside(o BBox) bool {
+	cx, cy := (b.X1+b.X2)/2, (b.Y1+b.Y2)/2
+	return cx >= o.X1 && cx <= o.X2 && cy >= o.Y1 && cy <= o.Y2
 }
-func minf(a, b float64) float64 {
-	if a < b { return a }
-	return b
-}
+
+func maxf(a, b float64) float64 { if a > b { return a }; return b }
+func minf(a, b float64) float64 { if a < b { return a }; return b }
 
 type RawOCRCandidate struct {
 	Text       string  `json:"text"`
@@ -60,6 +57,7 @@ type Observation struct {
 	OCR                []RawOCRCandidate `json:"ocr"`
 	Lane               string            `json:"lane,omitempty"`
 	Direction          string            `json:"direction,omitempty"`
+	EvidenceJPEG       []byte            `json:"-"`
 }
 
 type NormalizedObservation struct {
@@ -70,6 +68,7 @@ type NormalizedObservation struct {
 	Candidates         []Candidate
 	Lane               string
 	Direction          string
+	EvidenceJPEG       []byte
 }
 
 type PlateEvent struct {
@@ -91,4 +90,6 @@ type PlateEvent struct {
 	BBox               BBox        `json:"bbox"`
 	Lane               string      `json:"lane,omitempty"`
 	Direction          string      `json:"direction,omitempty"`
+	SnapshotRef        string      `json:"snapshot_ref,omitempty"`
+	EvidenceJPEG       []byte      `json:"-"`
 }
