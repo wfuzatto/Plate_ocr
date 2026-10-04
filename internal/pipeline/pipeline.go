@@ -1,12 +1,14 @@
 package pipeline
 
 import (
+	"bytes"
 	"context"
 	"errors"
 
 	"github.com/wfuzatto/Plate_ocr/internal/app"
 	"github.com/wfuzatto/Plate_ocr/internal/domain"
 	"github.com/wfuzatto/Plate_ocr/internal/inference"
+	"github.com/wfuzatto/Plate_ocr/internal/vision"
 )
 
 type Pipeline struct {
@@ -16,19 +18,26 @@ type Pipeline struct {
 }
 
 func New(detector inference.Detector, recognizer inference.Recognizer, engine *app.Engine) (*Pipeline,error) {
-	if detector==nil || recognizer==nil || engine==nil {
-		return nil,errors.New("detector, recognizer and engine are required")
-	}
+	if detector==nil || recognizer==nil || engine==nil { return nil,errors.New("detector, recognizer and engine are required") }
 	return &Pipeline{detector:detector,recognizer:recognizer,engine:engine},nil
 }
 
 func (p *Pipeline) ProcessFrame(ctx context.Context, frame inference.Frame) ([]domain.PlateEvent,error) {
-	if frame.CameraID=="" || frame.Width<=0 || frame.Height<=0 || len(frame.Data)==0 {
-		return nil,errors.New("invalid frame")
+	if frame.CameraID=="" || (len(frame.Data)==0 && frame.Image==nil) { return nil,errors.New("invalid frame") }
+	if frame.Image==nil {
+		img,_,err:=vision.Decode(bytes.NewReader(frame.Data))
+		if err!=nil{return nil,err}
+		frame.Image=img
+		b:=img.Bounds()
+		frame.Width,frame.Height=b.Dx(),b.Dy()
+	}
+	if frame.Width<=0||frame.Height<=0 {
+		b:=frame.Image.Bounds();frame.Width,frame.Height=b.Dx(),b.Dy()
 	}
 	detections,err:=p.detector.Detect(ctx,frame)
 	if err!=nil { return nil,err }
 	var events []domain.PlateEvent
+	evidence:=frame.Data
 	for _,detection:=range detections {
 		if !detection.BBox.Valid() || detection.Confidence<=0 { continue }
 		ocr,err:=p.recognizer.Recognize(ctx,frame,detection)
@@ -36,11 +45,14 @@ func (p *Pipeline) ProcessFrame(ctx context.Context, frame inference.Frame) ([]d
 		got,err:=p.engine.Process(domain.Observation{
 			CameraID:frame.CameraID, ObservedAt:frame.ObservedAt,
 			DetectorConfidence:detection.Confidence, BBox:detection.BBox, OCR:ocr,
-			Lane:detection.Lane, Direction:detection.Direction,
+			Lane:firstNonEmpty(detection.Lane,frame.Lane), Direction:firstNonEmpty(detection.Direction,frame.Direction),
+			EvidenceJPEG:evidence,
 		})
 		if err!=nil { return events,err }
 		events=append(events,got...)
 	}
+	events=append(events,p.engine.Tick(frame.ObservedAt)...)
 	return events,nil
 }
 func (p *Pipeline) FlushAll() []domain.PlateEvent { return p.engine.FlushAll() }
+func firstNonEmpty(a,b string)string{if a!=""{return a};return b}

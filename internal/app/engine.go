@@ -62,11 +62,15 @@ func (e *Engine) Process(o domain.Observation) ([]domain.PlateEvent,error) {
 	}
 	e.agg.Observe(domain.NormalizedObservation{
 		CameraID:o.CameraID, ObservedAt:o.ObservedAt, DetectorConfidence:o.DetectorConfidence,
-		BBox:o.BBox, Candidates:all, Lane:o.Lane, Direction:o.Direction,
+		BBox:o.BBox, Candidates:all, Lane:o.Lane, Direction:o.Direction, EvidenceJPEG:o.EvidenceJPEG,
 	})
 	return e.flush(o.ObservedAt),nil
 }
 
+func (e *Engine) Tick(now time.Time) []domain.PlateEvent {
+	if now.IsZero(){now=time.Now().UTC()}
+	return e.flush(now)
+}
 func (e *Engine) FlushAll() []domain.PlateEvent { return e.filter(e.agg.FlushAll()) }
 func (e *Engine) flush(now time.Time) []domain.PlateEvent { return e.filter(e.agg.FlushExpired(now)) }
 func (e *Engine) filter(in []domain.PlateEvent) []domain.PlateEvent {
@@ -74,9 +78,7 @@ func (e *Engine) filter(in []domain.PlateEvent) []domain.PlateEvent {
 	for _,ev:=range in {
 		if e.dedupe.Accept(ev.DedupeKey,ev.ObservedAt) {
 			out=append(out,ev); e.Metrics.Published.Add(1)
-		} else {
-			e.Metrics.Deduplicated.Add(1)
-		}
+		} else { e.Metrics.Deduplicated.Add(1) }
 	}
 	return out
 }
