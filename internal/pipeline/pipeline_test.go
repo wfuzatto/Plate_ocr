@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"image"
 	"testing"
 	"time"
 
@@ -29,7 +30,7 @@ func TestPipeline(t *testing.T) {
 	for i:=0;i<2;i++ {
 		_,err=p.ProcessFrame(context.Background(),inference.Frame{
 			CameraID:"cam",ObservedAt:now.Add(time.Duration(i)*100*time.Millisecond),
-			Width:1920,Height:1080,Format:inference.PixelNV12,Data:[]byte{1},
+			Width:1920,Height:1080,Format:inference.PixelNV12,Image:image.NewGray(image.Rect(0,0,1920,1080)),
 		})
 		if err!=nil { t.Fatal(err) }
 	}
